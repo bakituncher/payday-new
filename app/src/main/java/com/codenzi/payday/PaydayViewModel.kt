@@ -1,0 +1,691 @@
+package com.codenzi.payday
+
+import android.annotation.SuppressLint
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.*
+import com.github.mikephil.charting.data.BarEntry
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.PieEntry
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.gson.Gson
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.*
+import kotlin.math.min
+
+fun LocalDate.toStartOfDayDate(): Date {
+    return Date.from(this.atStartOfDay(ZoneId.systemDefault()).toInstant())
+}
+
+fun LocalDate.toEndOfDayDate(): Date {
+    return Date.from(this.atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant())
+}
+
+
+@SuppressLint("StaticFieldLeak")
+@Suppress("DEPRECATION")
+class PaydayViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val tag = "PaydayAutomation"
+    private val repository = PaydayRepository(application)
+    private val context = application.applicationContext
+
+    private val _uiState = MutableLiveData<PaydayUiState>()
+    val uiState: LiveData<PaydayUiState> = _uiState
+
+    private val _financialInsight = MutableLiveData<Event<String?>>()
+    val financialInsight: LiveData<Event<String?>> = _financialInsight
+
+    private val _widgetUpdateEvent = MutableLiveData<Event<Unit>>()
+    val widgetUpdateEvent: LiveData<Event<Unit>> = _widgetUpdateEvent
+
+    private val _newAchievementEvent = MutableLiveData<Event<Achievement>>()
+    val newAchievementEvent: LiveData<Event<Achievement>> = _newAchievementEvent
+
+    private val _goalCompletedEvent = MutableLiveData<Event<SavingsGoal>>()
+    val goalCompletedEvent: LiveData<Event<SavingsGoal>> = _goalCompletedEvent
+
+    private val _dailySpendingData = MutableLiveData<Pair<List<BarEntry>, List<String>>>()
+    val dailySpendingData: LiveData<Pair<List<BarEntry>, List<String>>> = _dailySpendingData
+
+    private val _monthlyCategorySpendingData = MutableLiveData<Pair<List<Entry>, List<String>>>()
+    val monthlyCategorySpendingData: LiveData<Pair<List<Entry>, List<String>>> = _monthlyCategorySpendingData
+
+    private val _showRestoreWarningEvent = MutableLiveData<Event<Unit>>()
+    val showRestoreWarningEvent: LiveData<Event<Unit>> = _showRestoreWarningEvent
+
+    private val _toastEvent = MutableLiveData<Event<String>>()
+    val toastEvent: LiveData<Event<String>> = _toastEvent
+
+    private val _accountDeletionResult = MutableLiveData<Event<Boolean>>()
+    val accountDeletionResult: LiveData<Event<Boolean>> = _accountDeletionResult
+
+    private val _transactionToEdit = MutableLiveData<Transaction?>()
+    val transactionToEdit: LiveData<Transaction?> = _transactionToEdit
+    private var transactionObserverJob: Job? = null
+
+    // --- REKLAM İÇİN YENİ ---
+    // Arayüze (Activity/Fragment) reklam gösterme olayını bildirmek için.
+    private val _showAdEvent = MutableLiveData<Event<Unit>>()
+    val showAdEvent: LiveData<Event<Unit>> = _showAdEvent
+    // --- REKLAM İÇİN YENİ SONU ---
+
+    private val currentPayCycle = MutableStateFlow<Pair<Date, Date>?>(null)
+    private var lastPaydayResult: PaydayResult? = null // BİLDİRİM SİSTEMİ İÇİN EKLENDİ
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val transactionsForCurrentCycle: LiveData<List<Transaction>> = currentPayCycle.flatMapLatest { cycle ->
+        if (cycle != null) {
+            repository.getTransactionsBetweenDates(cycle.first, cycle.second)
+        } else {
+            flowOf(emptyList())
+        }
+    }.asLiveData()
+
+
+    init {
+        checkUsageStreakAchievements()
+        loadData()
+        checkForRestoreValidation()
+    }
+
+    // BİLDİRİM SİSTEMİ İÇİN YENİ FONKSİYON
+    fun getPaydayResult(): PaydayResult? {
+        return lastPaydayResult
+    }
+
+    private fun checkForRestoreValidation() {
+        viewModelScope.launch {
+            if (repository.isRestoreValidationNeeded().first()) {
+                _showRestoreWarningEvent.postValue(Event(Unit))
+                repository.clearRestoreValidationFlag()
+            }
+        }
+    }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            val success = repository.deleteAllUserData()
+            _accountDeletionResult.postValue(Event(success))
+        }
+    }
+
+    fun clearLocalData() {
+        viewModelScope.launch {
+            repository.clearLocalData()
+        }
+    }
+
+    private fun checkUsageStreakAchievements() {
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            val firstLaunchDateStr = repository.getFirstLaunchDate().first()
+
+            if (firstLaunchDateStr == null) {
+                repository.setFirstLaunchDate(today)
+                return@launch
+            }
+
+            val firstLaunchDate = LocalDate.parse(firstLaunchDateStr)
+            val daysSinceFirstLaunch = ChronoUnit.DAYS.between(firstLaunchDate, today)
+
+            val achievementsToCheck = mapOf(
+                "STREAK_7_DAYS" to 7L,
+                "STREAK_30_DAYS" to 30L,
+                "STREAK_180_DAYS" to 180L,
+                "LEGEND_ONE_YEAR" to 365L
+            )
+
+            achievementsToCheck.forEach { (id, requiredDays) ->
+                if (daysSinceFirstLaunch >= requiredDays) {
+                    unlockAchievement(id)
+                }
+            }
+        }
+    }
+
+    fun loadData() {
+        viewModelScope.launch {
+            checkAndProcessPostPaydayTasks()
+
+            val paydayValue = repository.getPaydayValue().first()
+            val weekendAdjustment = repository.isWeekendAdjustmentEnabled().first()
+            val salaryAmount = repository.getSalaryAmount().first()
+            val goals = repository.getGoals().first()
+            val carryOverAmount = repository.getCarryOverAmount().first()
+
+            val result = PaydayCalculator.calculate(
+                dateToCheck = LocalDate.now(),
+                payPeriod = PayPeriod.MONTHLY,
+                paydayValue = paydayValue,
+                biWeeklyRefDateString = null,
+                weekendAdjustmentEnabled = weekendAdjustment
+            )
+
+            lastPaydayResult = result // BİLDİRİM SİSTEMİ İÇİN GÜNCELLENDİ
+
+            if (result != null) {
+                val cycleStartDate = result.cycleStartDate.toStartOfDayDate()
+                val cycleEndDate = result.cycleEndDate.toEndOfDayDate()
+                currentPayCycle.value = Pair(cycleStartDate, cycleEndDate)
+
+                repository.getSpendingByCategoryBetweenDates(cycleStartDate, cycleEndDate).collectLatest { categorySpending ->
+                    val allTransactionsInCycle = repository.getTransactionsBetweenDates(cycleStartDate, cycleEndDate).first()
+                    val totalExpenses = allTransactionsInCycle
+                        .filter { it.categoryId != ExpenseCategory.getSavingsCategoryId() }
+                        .sumOf { it.amount }
+                    val totalSavings = allTransactionsInCycle
+                        .filter { it.categoryId == ExpenseCategory.getSavingsCategoryId() }
+                        .sumOf { it.amount }
+
+                    updateUi(result, salaryAmount, totalExpenses, totalSavings, goals, categorySpending, carryOverAmount)
+                    generateFinancialInsights(totalExpenses, totalSavings, categorySpending, salaryAmount, carryOverAmount, result)
+                }
+            } else {
+                _uiState.postValue(PaydayUiState(daysLeftText = context.getString(R.string.day_not_set_placeholder), daysLeftSuffix = context.getString(R.string.welcome_message)))
+            }
+        }
+    }
+
+    private suspend fun checkAndProcessPostPaydayTasks() {
+        val yesterday = LocalDate.now().minusDays(1)
+
+        val paydayValue = repository.getPaydayValue().first()
+        val weekendAdjustment = repository.isWeekendAdjustmentEnabled().first()
+
+        val resultForYesterday = PaydayCalculator.calculate(
+            dateToCheck = yesterday,
+            payPeriod = PayPeriod.MONTHLY,
+            paydayValue = paydayValue,
+            biWeeklyRefDateString = null,
+            weekendAdjustmentEnabled = weekendAdjustment
+        )
+
+        if (resultForYesterday != null && resultForYesterday.isPayday) {
+            val lastProcessedDateStr = repository.getLastProcessedPayday().first()
+            if (lastProcessedDateStr == null || !LocalDate.parse(lastProcessedDateStr).isEqual(yesterday)) {
+                runCycleEndTasks(resultForYesterday)
+            }
+        }
+    }
+
+    private suspend fun runCycleEndTasks(paydayResult: PaydayResult) {
+        unlockAchievement("PAYDAY_HYPE")
+
+        val previousCycleStartDate = paydayResult.cycleStartDate.toStartOfDayDate()
+        val previousCycleEndDate = paydayResult.cycleEndDate.toEndOfDayDate()
+
+        val summary = repository.getPreviousCycleSummary(previousCycleStartDate, previousCycleEndDate)
+        val expenses = summary.totalExpenses
+        val totalSavings = summary.totalSavings
+
+        val salary = repository.getSalaryAmount().first()
+        val carryOver = repository.getCarryOverAmount().first()
+
+        val remainingFromPreviousCycle = (salary + carryOver) - expenses - totalSavings
+        repository.saveCarryOverAmount(remainingFromPreviousCycle.toLong())
+
+
+        if (salary > expenses) {
+            unlockAchievement("BUDGET_WIZARD")
+            val consecutivePositiveCycles = (repository.getConsecutivePositiveCycles().first() ?: 0) + 1
+            repository.saveConsecutivePositiveCycles(consecutivePositiveCycles)
+            if (consecutivePositiveCycles >= 3) {
+                unlockAchievement("CYCLE_CHAMPION")
+            }
+        } else {
+            repository.saveConsecutivePositiveCycles(0)
+        }
+
+        if (repository.isAutoSavingEnabled().first()) {
+            val monthlySavings = repository.getMonthlySavingsAmount().first()
+            if (monthlySavings > 0) {
+                distributeSavingsToGoals(monthlySavings.toDouble())
+            }
+        }
+
+        val templates = repository.getRecurringTransactionTemplates().first()
+        templates.forEach { template ->
+            val newTransaction = Transaction(
+                name = template.name,
+                amount = template.amount,
+                date = Date(),
+                categoryId = template.categoryId,
+                isRecurringTemplate = false
+            )
+            repository.insertTransaction(newTransaction)
+        }
+
+        if (repository.isAutoBackupEnabled().first()) {
+            performAutoBackup()
+        }
+
+        repository.saveLastProcessedPayday(LocalDate.now().minusDays(1))
+    }
+
+    private fun generateFinancialInsights(
+        totalExpenses: Double,
+        totalSavings: Double,
+        categorySpending: List<CategorySpending>,
+        salaryAmount: Long,
+        carryOverAmount: Long,
+        paydayResult: PaydayResult
+    ) {
+        val totalIncome = salaryAmount + carryOverAmount
+        val remainingAmount = totalIncome - totalExpenses - totalSavings
+
+        // 1. Bütçe Aşımı Uyarısı (En Yüksek Öncelik)
+        if (remainingAmount < 0) {
+            _financialInsight.postValue(Event(context.getString(R.string.suggestion_budget_exceeded)))
+            return
+        }
+
+        // 2. Yüksek Harcama Kategorisi Uyarısı
+        val transactionsInCycle = transactionsForCurrentCycle.value ?: emptyList()
+        if (transactionsInCycle.size > 1 && totalExpenses > 100) {
+            val topCategorySpending = categorySpending.maxByOrNull { it.totalAmount }
+            if (topCategorySpending != null && topCategorySpending.totalAmount > totalExpenses * 0.4) {
+                val topCategory = ExpenseCategory.fromId(topCategorySpending.categoryId)
+                val insight = context.getString(R.string.suggestion_high_spending, topCategory.getDisplayName(context))
+                _financialInsight.postValue(Event(insight))
+                return
+            }
+        }
+
+        // 3. Bütçe Sınırına Yaklaşma Uyarısı
+        if (totalIncome > 0 && (remainingAmount / totalIncome) < 0.15) {
+            _financialInsight.postValue(Event(context.getString(R.string.suggestion_approaching_budget_limit)))
+            return
+        }
+
+        // 4. İyi Gidişat ve Tasarruf Önerisi
+        val totalDaysInCycle = paydayResult.totalDaysInCycle
+        if (totalDaysInCycle > 0) {
+            val daysPassed = ChronoUnit.DAYS.between(paydayResult.cycleStartDate, LocalDate.now())
+            val cycleProgress = daysPassed.toDouble() / totalDaysInCycle.toDouble()
+
+            // Döngünün yarısından fazlası geçtiyse ve harcamalar gelirin %30'undan azsa
+            if (cycleProgress > 0.5 && totalExpenses < totalIncome * 0.3) {
+                _financialInsight.postValue(Event(context.getString(R.string.suggestion_good_progress)))
+                return
+            }
+
+            // Döngünün sonuna gelinmişse ve hala para varsa
+            if (cycleProgress > 0.8 && remainingAmount > totalIncome * 0.2) {
+                _financialInsight.postValue(Event(context.getString(R.string.suggestion_good_progress_transfer)))
+                return
+            }
+        }
+
+        // Hiçbir koşul karşılanmazsa öneri gösterme
+        _financialInsight.postValue(Event(null))
+    }
+
+
+    private fun updateUi(
+        paydayResult: PaydayResult,
+        salaryAmount: Long,
+        totalExpenses: Double,
+        totalSavings: Double,
+        goals: List<SavingsGoal>,
+        categorySpending: List<CategorySpending>,
+        carryOverAmount: Long
+    ) {
+        val totalIncome = salaryAmount + carryOverAmount
+        val remainingAmount = totalIncome - totalExpenses - totalSavings
+
+        val pieEntries = categorySpending.map { spending: CategorySpending ->
+            val category = ExpenseCategory.fromId(spending.categoryId)
+            PieEntry(spending.totalAmount.toFloat(), category.getDisplayName(context))
+        }
+
+        val transactionsList = transactionsForCurrentCycle.value ?: emptyList()
+        val newState = PaydayUiState(
+            daysLeftText = if (paydayResult.isPayday) "🎉" else paydayResult.daysLeft.toString(),
+            daysLeftSuffix = if (paydayResult.isPayday) context.getString(R.string.payday_is_today) else context.getString(R.string.days_left_suffix),
+            isPayday = paydayResult.isPayday,
+            savingsGoals = goals,
+            areGoalsVisible = goals.isNotEmpty(),
+            areTransactionsVisible = transactionsList.isNotEmpty(),
+            incomeText = formatCurrency(salaryAmount.toDouble()),
+            expensesText = formatCurrency(totalExpenses, "- "),
+            savingsText = formatCurrency(totalSavings),
+            remainingText = formatCurrency(remainingAmount),
+            carryOverAmount = carryOverAmount,
+            actualRemainingAmountForGoals = remainingAmount,
+            categorySpendingData = pieEntries
+        )
+        _uiState.postValue(newState)
+        _widgetUpdateEvent.postValue(Event(Unit))
+    }
+
+    fun insertTransaction(name: String, amount: Double, categoryId: Int, isRecurring: Boolean) = viewModelScope.launch {
+        if (name.isNotBlank() && amount > 0) {
+            val transaction = Transaction(
+                name = name,
+                amount = amount,
+                date = Date(),
+                categoryId = categoryId,
+                isRecurringTemplate = isRecurring
+            )
+            repository.insertTransaction(transaction)
+
+            // --- REKLAM İÇİN YENİ ---
+            // Harcama eklendikten sonra sayacı artır ve kontrol et.
+            repository.incrementTransactionAdCounter()
+            val adCounter = repository.getTransactionAdCounter().first()
+            if (adCounter % 3 == 0) {
+                _showAdEvent.postValue(Event(Unit))
+            }
+            // --- REKLAM İÇİN YENİ SONU ---
+
+            unlockAchievement("FIRST_TRANSACTION")
+            if (isRecurring) {
+                unlockAchievement("AUTO_PILOT")
+            }
+            checkCategoryExpertAchievement()
+            loadData()
+        }
+    }
+
+    fun updateTransaction(transactionToUpdate: Transaction) = viewModelScope.launch {
+        if (transactionToUpdate.name.isNotBlank() && transactionToUpdate.amount > 0) {
+            repository.updateTransaction(transactionToUpdate)
+            if (transactionToUpdate.isRecurringTemplate) {
+                unlockAchievement("AUTO_PILOT")
+            }
+            checkCategoryExpertAchievement()
+            loadData()
+        }
+    }
+
+    fun deleteTransaction(transaction: Transaction) = viewModelScope.launch {
+        repository.deleteTransaction(transaction)
+        loadData()
+    }
+
+    fun deleteRecurringTemplate(transaction: Transaction) = viewModelScope.launch {
+        if(transaction.isRecurringTemplate){
+            repository.deleteTransaction(transaction)
+        }
+    }
+
+    fun addOrUpdateGoal(name: String, amount: Double, existingGoalId: String?, targetDate: Long?, categoryId: Int, portion: Int) = viewModelScope.launch {
+        if (name.isNotBlank() && amount > 0) {
+            val oldGoals = repository.getGoals().first()
+            val newGoals = oldGoals.toMutableList()
+
+            if (existingGoalId == null) {
+                newGoals.add(SavingsGoal(name = name, targetAmount = amount, categoryId = categoryId, targetDate = targetDate, portion = portion))
+                unlockAchievement("FIRST_GOAL")
+                if (newGoals.size >= 3) {
+                    unlockAchievement("COLLECTOR")
+                }
+            } else {
+                val index = newGoals.indexOfFirst { it.id == existingGoalId }
+                if (index != -1) {
+                    newGoals[index] = newGoals[index].copy(name = name, targetAmount = amount, categoryId = categoryId, targetDate = targetDate, portion = portion)
+                }
+            }
+            repository.saveGoals(newGoals)
+            checkAndNotifyForCompletedGoals(oldGoals, newGoals)
+            loadData()
+        }
+    }
+
+    fun deleteGoal(goal: SavingsGoal) = viewModelScope.launch {
+        val currentGoals = repository.getGoals().first().toMutableList()
+        currentGoals.remove(goal)
+        repository.saveGoals(currentGoals)
+        loadData()
+    }
+
+    fun releaseFundsFromGoal(goal: SavingsGoal) = viewModelScope.launch {
+        val refundTransaction = Transaction(
+            name = context.getString(R.string.goal_refund_transaction_name, goal.name),
+            amount = -goal.savedAmount,
+            date = Date(),
+            categoryId = ExpenseCategory.getSavingsCategoryId(),
+            isRecurringTemplate = false
+        )
+        repository.insertTransaction(refundTransaction)
+        deleteGoal(goal)
+    }
+
+    fun onSettingsResult() {
+        checkThemeAchievement()
+        loadData()
+    }
+
+    private suspend fun distributeSavingsToGoals(totalSavingsAmount: Double) {
+        val oldGoals = repository.getGoals().first()
+        val activeGoals = oldGoals.filter { !it.isComplete }
+
+        if (activeGoals.isEmpty()) {
+            if (totalSavingsAmount > 0) {
+                val transaction = Transaction(
+                    name = context.getString(R.string.auto_savings_general),
+                    amount = totalSavingsAmount,
+                    date = Date(),
+                    categoryId = ExpenseCategory.SAVINGS.ordinal
+                )
+                repository.insertTransaction(transaction)
+            }
+            return
+        }
+
+        val newGoals = oldGoals.toMutableList()
+        var distributedAmount = 0.0
+
+        activeGoals.forEach { goal ->
+            val goalIndex = newGoals.indexOfFirst { it.id == goal.id }
+            if (goalIndex != -1) {
+                val currentGoal = newGoals[goalIndex]
+                val amountToDistribute = totalSavingsAmount * (currentGoal.portion / 100.0)
+                val neededForGoal = currentGoal.targetAmount - currentGoal.savedAmount
+                val amountToAdd = min(amountToDistribute, neededForGoal)
+
+                if (amountToAdd > 0) {
+                    newGoals[goalIndex] = currentGoal.copy(savedAmount = currentGoal.savedAmount + amountToAdd)
+                    val transaction = Transaction(
+                        name = context.getString(R.string.auto_savings_transaction_name, goal.name),
+                        amount = amountToAdd,
+                        date = Date(),
+                        categoryId = ExpenseCategory.SAVINGS.ordinal
+                    )
+                    repository.insertTransaction(transaction)
+                    distributedAmount += amountToAdd
+                }
+            }
+        }
+
+        val remainingSavings = totalSavingsAmount - distributedAmount
+        if (remainingSavings > 0.01) {
+            val transaction = Transaction(
+                name = context.getString(R.string.auto_savings_general),
+                amount = remainingSavings,
+                date = Date(),
+                categoryId = ExpenseCategory.SAVINGS.ordinal
+            )
+            repository.insertTransaction(transaction)
+        }
+
+        repository.saveGoals(newGoals)
+        checkAndNotifyForCompletedGoals(oldGoals, newGoals)
+    }
+
+    private fun performAutoBackup() {
+        viewModelScope.launch {
+            if (GoogleSignIn.getLastSignedInAccount(getApplication()) == null) return@launch
+
+            try {
+                val googleDriveManager = GoogleDriveManager(getApplication())
+                val backupData = repository.getAllDataForBackup()
+                val backupJson = Gson().toJson(backupData)
+                googleDriveManager.uploadFileContent(backupJson)
+            } catch (e: Exception) {
+                Log.e(tag, "Otomatik yedekleme sırasında bir hata oluştu.", e)
+            }
+        }
+    }
+
+    fun addFundsToGoal(goalId: String, amountToAdd: Double) = viewModelScope.launch {
+        val currentState = _uiState.value ?: return@launch
+        if (amountToAdd > currentState.actualRemainingAmountForGoals) {
+            _toastEvent.postValue(Event(context.getString(R.string.insufficient_funds_error)))
+            return@launch
+        }
+
+        val oldGoals = repository.getGoals().first()
+        val newGoals = oldGoals.toMutableList()
+        val goalIndex = newGoals.indexOfFirst { it.id == goalId }
+
+        if (goalIndex == -1 || newGoals[goalIndex].isComplete) return@launch
+
+        val goal = newGoals[goalIndex]
+        val neededAmount = goal.targetAmount - goal.savedAmount
+        val finalAmountToAdd = min(amountToAdd, neededAmount)
+
+        if (finalAmountToAdd <= 0) return@launch
+
+        newGoals[goalIndex] = goal.copy(savedAmount = goal.savedAmount + finalAmountToAdd)
+        repository.saveGoals(newGoals)
+
+        val transaction = Transaction(
+            name = context.getString(R.string.add_funds_to_goal_transaction_name, goal.name),
+            amount = finalAmountToAdd,
+            date = Date(),
+            categoryId = ExpenseCategory.SAVINGS.ordinal
+        )
+        repository.insertTransaction(transaction)
+
+        checkAndNotifyForCompletedGoals(oldGoals, newGoals)
+
+        val totalSavedAmount = newGoals.sumOf { it.savedAmount }
+        if (totalSavedAmount >= 1000) unlockAchievement("SAVER_LV1")
+        if (totalSavedAmount >= 10000) unlockAchievement("SAVER_LV2")
+        if (totalSavedAmount >= 50000) unlockAchievement("SAVER_LV3")
+
+        loadData()
+    }
+
+    private fun checkAndNotifyForCompletedGoals(oldGoals: List<SavingsGoal>, newGoals: List<SavingsGoal>) {
+        newGoals.forEach { newGoal ->
+            val oldGoal = oldGoals.find { it.id == newGoal.id }
+            if (newGoal.isComplete && (oldGoal == null || !oldGoal.isComplete)) {
+                _goalCompletedEvent.postValue(Event(newGoal))
+                unlockAchievement("GOAL_COMPLETED")
+            }
+        }
+    }
+
+    fun loadTransactionToEdit(id: Int) {
+        transactionObserverJob?.cancel()
+        transactionObserverJob = viewModelScope.launch {
+            repository.getTransactionById(id).collect { transaction ->
+                _transactionToEdit.postValue(transaction)
+            }
+        }
+    }
+
+    fun onDialogDismissed() {
+        _transactionToEdit.postValue(null)
+        transactionObserverJob?.cancel()
+    }
+
+    fun loadDailySpending(startDate: Date, endDate: Date) {
+        viewModelScope.launch {
+            repository.getDailySpendingForChart(startDate, endDate).collect { dailySpendingList ->
+                val labels = dailySpendingList.map { it.day.substring(5) }
+                val barEntries = dailySpendingList.mapIndexed { index, dailySpending ->
+                    BarEntry(index.toFloat(), dailySpending.totalAmount.toFloat())
+                }
+                _dailySpendingData.postValue(Pair(barEntries, labels))
+            }
+        }
+    }
+
+    fun loadMonthlySpendingForCategory(categoryId: Int) {
+        viewModelScope.launch {
+            repository.getMonthlySpendingForCategory(categoryId).collect { monthlySpendingList ->
+                val labels = monthlySpendingList.map {
+                    val dateParts = it.month.split("-")
+                    if (dateParts.size == 2) "${dateParts[1]}/${dateParts[0]}" else it.month
+                }
+                val lineEntries = monthlySpendingList.mapIndexed { index, monthlySpending ->
+                    Entry(index.toFloat(), monthlySpending.totalAmount.toFloat())
+                }
+                _monthlyCategorySpendingData.postValue(Pair(lineEntries, labels))
+            }
+        }
+    }
+
+    private fun formatCurrency(amount: Double, prefix: String = ""): String {
+        return prefix + NumberFormat.getCurrencyInstance(Locale.getDefault()).format(amount)
+    }
+
+    fun savePayPeriod() = viewModelScope.launch {
+        repository.savePayPeriod(PayPeriod.MONTHLY)
+    }
+
+    fun savePayday(day: Int) = viewModelScope.launch { repository.savePayday(day) }
+
+    fun saveSalary(salary: Long) = viewModelScope.launch { repository.saveSalary(salary) }
+
+    fun saveMonthlySavings(amount: Long) = viewModelScope.launch { repository.saveMonthlySavings(amount) }
+
+    private fun unlockAchievement(achievementId: String) {
+        viewModelScope.launch {
+            val unlockedIds = repository.getUnlockedAchievementIds().first()
+            if (!unlockedIds.contains(achievementId)) {
+                repository.unlockAchievement(achievementId)
+                AchievementsManager.getAllAchievements().find { it.id == achievementId }?.let {
+                    _newAchievementEvent.postValue(Event(it))
+                }
+            }
+        }
+    }
+
+    private fun checkCategoryExpertAchievement() {
+        viewModelScope.launch {
+            val allTransactions = repository.getAllTransactionsForAchievements().first()
+            val distinctCategories = allTransactions
+                .filter { it.categoryId != ExpenseCategory.getSavingsCategoryId() }
+                .map { it.categoryId }
+                .distinct()
+
+            if (distinctCategories.size >= 5) {
+                unlockAchievement("CATEGORY_EXPERT")
+            }
+        }
+    }
+
+    private fun checkThemeAchievement() {
+        viewModelScope.launch {
+            val currentTheme = repository.getTheme().first()
+            if (currentTheme == "Dark") {
+                unlockAchievement("DARK_SIDE")
+            }
+        }
+    }
+
+    fun triggerSetupCompleteAchievement() {
+        unlockAchievement("SETUP_COMPLETE")
+    }
+
+    fun triggerBackupHeroAchievement() {
+        unlockAchievement("BACKUP_HERO")
+    }
+
+    fun triggerReportsViewedAchievement() {
+        unlockAchievement("REPORTS_VIEWED")
+    }
+}
