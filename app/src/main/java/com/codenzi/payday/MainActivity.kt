@@ -60,6 +60,7 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.RequestConfiguration
 
 @Suppress("DEPRECATION")
 class MainActivity : AppCompatActivity() {
@@ -138,15 +139,21 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         firebaseAnalytics = Firebase.analytics
 
-        // --- REKLAM KODLARI ---
+// --- REKLAM KODLARI ---
         MobileAds.initialize(this) {}
-        // Banner Reklamı
+
+// Test cihazınızı burada yapılandırın
+        val testDeviceIds = listOf("BCF3B4664E529BDE4CC3E6B2CB090F7B")
+        val configuration = RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
+        MobileAds.setRequestConfiguration(configuration)
+
+// Banner Reklamı
         adView = findViewById(R.id.adView)
         val adRequest = AdRequest.Builder().build()
         adView.loadAd(adRequest)
-        // Geçiş Reklamını Yükle
+// Geçiş Reklamını Yükle
         loadInterstitialAd()
-        // --- REKLAM KODLARI SONU ---
+// --- REKLAM KODLARI SONU ---
 
         updateGreetingMessage()
         setupTitleRunnable()
