@@ -382,7 +382,7 @@ class PaydayViewModel(application: Application) : AndroidViewModel(application) 
             // Harcama eklendikten sonra sayacı artır ve kontrol et.
             repository.incrementTransactionAdCounter()
             val adCounter = repository.getTransactionAdCounter().first()
-            if (adCounter % 3 == 0) {
+            if (adCounter % 2 == 0) {
                 _showAdEvent.postValue(Event(Unit))
             }
             // --- REKLAM İÇİN YENİ SONU ---
