@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.DisplayMetrics
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
@@ -36,6 +37,9 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.codenzi.payday.databinding.ActivityMainBinding
 import com.codenzi.payday.notifications.NotificationScheduler
+import com.google.android.gms.ads.*
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -53,14 +57,6 @@ import java.text.NumberFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
-import com.google.android.gms.ads.RequestConfiguration
 
 @Suppress("DEPRECATION")
 class MainActivity : AppCompatActivity() {
@@ -87,7 +83,7 @@ class MainActivity : AppCompatActivity() {
     private val fromBottom: Animation by lazy { AnimationUtils.loadAnimation(this, R.anim.fab_open) }
     private val toBottom: Animation by lazy { AnimationUtils.loadAnimation(this, R.anim.fab_close) }
     private var isFabMenuOpen = false
-    private lateinit var adView: AdView
+    private var adView: AdView? = null // AdView artık nullable
     private var mInterstitialAd: InterstitialAd? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -139,21 +135,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         firebaseAnalytics = Firebase.analytics
 
-// --- REKLAM KODLARI ---
+        // --- REKLAM KODLARI ---
         MobileAds.initialize(this) {}
-
-// Test cihazınızı burada yapılandırın
         val testDeviceIds = listOf("BCF3B4664E529BDE4CC3E6B2CB090F7B")
         val configuration = RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
         MobileAds.setRequestConfiguration(configuration)
 
-// Banner Reklamı
-        adView = findViewById(R.id.adView)
-        val adRequest = AdRequest.Builder().build()
-        adView.loadAd(adRequest)
-// Geçiş Reklamını Yükle
+        // Banner ve Geçiş Reklamını Yükle
+        loadBanner()
         loadInterstitialAd()
-// --- REKLAM KODLARI SONU ---
+        // --- REKLAM KODLARI SONU ---
 
         updateGreetingMessage()
         setupTitleRunnable()
@@ -172,9 +163,35 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestPermissions()
     }
 
+    private fun loadBanner() {
+        if (adView != null) {
+            binding.adViewContainer.removeView(adView)
+            adView?.destroy()
+        }
+
+        adView = AdView(this)
+        binding.adViewContainer.addView(adView)
+        val adRequest = AdRequest.Builder().build()
+
+        val adWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val windowMetrics = windowManager.currentWindowMetrics
+            (windowMetrics.bounds.width() / resources.displayMetrics.density).toInt()
+        } else {
+            @Suppress("DEPRECATION")
+            val displayMetrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.getMetrics(displayMetrics)
+            (displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+        }
+
+        val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
+        adView?.adUnitId = getString(R.string.admob_banner_ad_unit_id)
+        adView?.setAdSize(adSize)
+        adView?.loadAd(adRequest)
+    }
+
     private fun loadInterstitialAd() {
         val adRequest = AdRequest.Builder().build()
-        // NOT: ID artık string kaynaklarından okunuyor.
         InterstitialAd.load(this, getString(R.string.admob_interstitial_ad_unit_id), adRequest,
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: InterstitialAd) {
@@ -189,6 +206,26 @@ class MainActivity : AppCompatActivity() {
             })
     }
 
+    // --- YAŞAM DÖNGÜSÜ YÖNETİMİ ---
+    override fun onResume() {
+        super.onResume()
+        adView?.resume()
+        titleHandler.post(titleRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        adView?.pause()
+        titleHandler.removeCallbacks(titleRunnable)
+        binding.toolbar.title = originalAppName
+    }
+
+    override fun onDestroy() {
+        adView?.destroy()
+        adView = null
+        super.onDestroy()
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_backup -> performActionWithSignIn(::backupData)
@@ -201,14 +238,12 @@ class MainActivity : AppCompatActivity() {
                 if (mInterstitialAd != null) {
                     mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
                         override fun onAdDismissedFullScreenContent() {
-                            // Reklam kapatıldıktan sonra Raporlar ekranına git ve yeni reklam yükle
                             startActivity(Intent(this@MainActivity, ReportsActivity::class.java))
                             loadInterstitialAd()
                         }
                     }
                     mInterstitialAd?.show(this)
                 } else {
-                    // Reklam yüklenmemişse direkt Raporlar ekranına git
                     startActivity(Intent(this, ReportsActivity::class.java))
                 }
             }
@@ -218,22 +253,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupObservers() {
-        // ... (Diğer observer'lar aynı kalacak)
-
-        // YENİ OBSERVER: ViewModel'dan gelen reklam gösterme olayını dinle
         viewModel.showAdEvent.observe(this) { event ->
             event.getContentIfNotHandled()?.let {
                 if (mInterstitialAd != null) {
                     mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
                         override fun onAdDismissedFullScreenContent() {
                             super.onAdDismissedFullScreenContent()
-                            // Reklam kapatıldıktan sonra bir sonraki için yenisini yükle
                             loadInterstitialAd()
                         }
                     }
                     mInterstitialAd?.show(this)
                 } else {
-                    // Reklam yüklenmemişse bir sonrakine hazırlık için yüklemeyi dene
                     loadInterstitialAd()
                 }
             }
@@ -319,18 +349,6 @@ class MainActivity : AppCompatActivity() {
             binding.transactionsRecyclerView.visibility = if (areTransactionsEmpty) View.GONE else View.VISIBLE
             binding.transactionsTitle.visibility = if (areTransactionsEmpty) View.GONE else View.VISIBLE
         }
-    }
-
-    // Diğer tüm fonksiyonlar aynı kalacak...
-    override fun onResume() {
-        super.onResume()
-        titleHandler.post(titleRunnable)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        titleHandler.removeCallbacks(titleRunnable)
-        binding.toolbar.title = originalAppName
     }
 
     private fun setupCustomFontForToolbar() {
