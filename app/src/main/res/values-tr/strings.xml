@@ -360,4 +360,18 @@
     <string name="intro_privacy_description">Girdiğiniz maaş ve harcama bilgileri <b>sadece sizin cihazınızda</b> saklanır. Google Drive\'a yedekleme yapsanız bile, bu veriler sizin özel alanınıza kaydedilir ve biz dahil <b>hiç kimse tarafından okunamaz</b>. Finansal verilerinizin kontrolü tamamen sizdedir.</string>
     <string name="greeting_night">İyi geceler</string>
 
+    <string-array name="intro_titles">
+        <item>Payday\'e Hoş Geldiniz!</item>
+        <item>Tüm Finans Yönetimi Tek Yerde</item>
+        <item>Verileriniz Tamamen Güvende</item>
+        <item>Finansal Özgürlüğe Hazır Mısınız?</item>
+    </string-array>
+
+    <string-array name="intro_descriptions">
+        <item>Maaş gününüze ne kadar kaldığını takip edin, harcamalarınızı yönetin ve hayalleriniz için birikim yapın.</item>
+        <item>Maaş gününüze geri sayım yapın, aylık giderlerinizi ve tasarruf hedeflerinizi kolayca yönetin. Bütçenizin kontrolü tamamen sizde olsun.</item>
+        <item>Girdiğiniz tüm finansal veriler, sadece sizin cihazınızda veya kendi Google Drive hesabınızda saklanır. Biz dahil hiç kimse verilerinize erişemez.</item>
+        <item>Payday ile paranızı yönetmek hiç bu kadar kolay olmamıştı. Hadi, bütçenizi oluşturarak ilk adımı atın!</item>
+    </string-array>
+
 </resources>

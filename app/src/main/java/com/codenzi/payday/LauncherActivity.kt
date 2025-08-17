@@ -21,8 +21,8 @@ class LauncherActivity : AppCompatActivity() {
                 // Eğer daha önce gösterildiyse, doğrudan Google Giriş ekranına git
                 navigateTo(LoginActivity::class.java)
             } else {
-                // Eğer ilk açılışsa, tanıtım ekranına git
-                navigateTo(IntroductoryActivity::class.java)
+                // Eğer ilk açılışsa, yeni ve gelişmiş tanıtım ekranına git
+                navigateTo(IntroActivity::class.java)
             }
         }
     }

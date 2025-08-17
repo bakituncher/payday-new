@@ -361,4 +361,18 @@
 
     <string name="intro_privacy_description">The salary and expense information you enter is stored <b>only on your device</b>. Even when backed up to Google Drive, this data is saved to your private space and <b>cannot be read by anyone</b>, including us. You are in full control of your financial data.</string>
     <string name="greeting_night">Good night</string>
+
+    <string-array name="intro_titles">
+        <item>Welcome to Payday!</item>
+        <item>All-in-One Finance Management</item>
+        <item>Your Data is Completely Secure</item>
+        <item>Ready for Financial Freedom?</item>
+    </string-array>
+
+    <string-array name="intro_descriptions">
+        <item>Track how much is left until your payday, manage your expenses, and save up for your dreams.</item>
+        <item>Count down to your payday, and easily manage your monthly expenses and savings goals. Take full control of your budget.</item>
+        <item>All financial data you enter is stored only on your device or in your own Google Drive account. No one, including us, can access your data.</item>
+        <item>Managing your money has never been easier with Payday. Let\'s take the first step by creating your budget!</item>
+    </string-array>
 </resources>
