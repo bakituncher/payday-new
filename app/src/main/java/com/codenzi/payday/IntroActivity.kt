@@ -32,6 +32,9 @@ class IntroActivity : AppCompatActivity() {
 
         TabLayoutMediator(binding.tabIndicator, binding.introViewPager) { _, _ -> }.attach()
 
+        binding.introViewPager.setPageTransformer(ParallaxPageTransformer())
+
+
         binding.introViewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 if (position == adapter.itemCount - 1) {

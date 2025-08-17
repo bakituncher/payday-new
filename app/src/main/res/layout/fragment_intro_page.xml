@@ -1,37 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="32dp">
+    android:paddingHorizontal="32dp">
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_top"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.12" />
 
     <ImageView
         android:id="@+id/intro_image"
-        android:layout_width="200dp"
-        android:layout_height="200dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        app:layout_constraintDimensionRatio="1:1"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/guideline_top"
+        app:layout_constraintWidth_percent="0.75"
         tools:src="@drawable/ic_launcher_foreground" />
 
     <TextView
         android:id="@+id/intro_title"
-        style="@style/TextAppearance.Material3.HeadlineSmall"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:textAlignment="center"
-        android:textStyle="bold"
-        tools:text="Uygulama Adı" />
+        android:layout_marginTop="48dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.App.Onboarding.Title"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/intro_image"
+        tools:text="Ay Sonunu Düşünmekten Yoruldun mu?" />
 
     <TextView
         android:id="@+id/intro_description"
-        style="@style/TextAppearance.Material3.BodyLarge"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:textAlignment="center"
-        android:textColor="?android:attr/textColorSecondary"
-        tools:text="Uygulamanın harika açıklaması burada yer alacak." />
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.App.Onboarding.Description"
+        app:layout_constraintEnd_toEndOf="@id/intro_title"
+        app:layout_constraintStart_toStartOf="@id/intro_title"
+        app:layout_constraintTop_toBottomOf="@id/intro_title"
+        tools:text="Payday, maaş gününe kadar paranızın nereye gittiğini net bir şekilde gösterir." />
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

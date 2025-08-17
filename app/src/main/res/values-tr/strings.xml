@@ -361,17 +361,17 @@
     <string name="greeting_night">İyi geceler</string>
 
     <string-array name="intro_titles">
-        <item>Payday\'e Hoş Geldiniz!</item>
-        <item>Tüm Finans Yönetimi Tek Yerde</item>
-        <item>Verileriniz Tamamen Güvende</item>
-        <item>Finansal Özgürlüğe Hazır Mısınız?</item>
+        <item>Ay Sonunu Düşünmekten Yoruldun mu?</item>
+        <item>Hayallerine ve Keyfine Yer Aç</item>
+        <item>Tüm Kontrol Senin Elinde (ve Güvende)</item>
+        <item>Daha Az Stres, Daha Çok Hayat</item>
     </string-array>
 
     <string-array name="intro_descriptions">
-        <item>Maaş gününüze ne kadar kaldığını takip edin, harcamalarınızı yönetin ve hayalleriniz için birikim yapın.</item>
-        <item>Maaş gününüze geri sayım yapın, aylık giderlerinizi ve tasarruf hedeflerinizi kolayca yönetin. Bütçenizin kontrolü tamamen sizde olsun.</item>
-        <item>Girdiğiniz tüm finansal veriler, sadece sizin cihazınızda veya kendi Google Drive hesabınızda saklanır. Biz dahil hiç kimse verilerinize erişemez.</item>
-        <item>Payday ile paranızı yönetmek hiç bu kadar kolay olmamıştı. Hadi, bütçenizi oluşturarak ilk adımı atın!</item>
+        <item>Payday, maaş gününe kadar paranızın nereye gittiğini net bir şekilde gösterir ve beklenmedik harcamalara karşı sizi hazırlar. Artık tahmin yürütmek yok.</item>
+        <item>Gereksiz harcamaları kolayca tespit edin, birikim hedefleri oluşturun ve en önemlisi, suçluluk duymadan sevdiğiniz şeylere para harcayın.</item>
+        <item>Bu senin paran, senin verilerin. Tüm bilgiler sadece telefonunda kalır. Finansal durumunu senden başka kimse göremez, biz bile.</item>
+        <item>Paranızı yönetmenin getirdiği stresi bir kenara bırakın. Finansal netlikle hayatın tadını çıkarmaya başlamak için ilk adımı atın.</item>
     </string-array>
 
 </resources>

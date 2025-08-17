@@ -16,6 +16,7 @@ class IntroPageFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        // HATA BURADAYDI, DÜZELTİLDİ:
         _binding = FragmentIntroPageBinding.inflate(inflater, container, false)
         return binding.root
     }

@@ -363,16 +363,16 @@
     <string name="greeting_night">Good night</string>
 
     <string-array name="intro_titles">
-        <item>Welcome to Payday!</item>
-        <item>All-in-One Finance Management</item>
-        <item>Your Data is Completely Secure</item>
-        <item>Ready for Financial Freedom?</item>
+        <item>Tired of Worrying About Payday?</item>
+        <item>Make Room for Your Dreams (and Fun)</item>
+        <item>You\'re in Full Control (and It\'s Secure)</item>
+        <item>Less Stress, More Life</item>
     </string-array>
 
     <string-array name="intro_descriptions">
-        <item>Track how much is left until your payday, manage your expenses, and save up for your dreams.</item>
-        <item>Count down to your payday, and easily manage your monthly expenses and savings goals. Take full control of your budget.</item>
-        <item>All financial data you enter is stored only on your device or in your own Google Drive account. No one, including us, can access your data.</item>
-        <item>Managing your money has never been easier with Payday. Let\'s take the first step by creating your budget!</item>
+        <item>Payday clearly shows you where your money goes until your next paycheck and prepares you for unexpected expenses. No more guesswork.</item>
+        <item>Easily spot unnecessary expenses, create savings goals, and most importantly, spend on what you love without the guilt.</item>
+        <item>It\'s your money, your data. All information stays only on your phone. No one else can see your financial situation, not even us.</item>
+        <item>Leave the stress of managing money behind. Take the first step to enjoy life with financial clarity.</item>
     </string-array>
 </resources>

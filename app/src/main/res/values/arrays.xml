@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <array name="intro_images">
-        <item>@mipmap/ic_launcher</item> <item>@drawable/ic_reports</item> <item>@drawable/ic_privacy_shield</item> <item>@drawable/ic_auto_awesome</item> </array>
+        <item>@mipmap/ic_launcher_foreground</item>
+
+        <item>@drawable/ic_reports</item>
+        <item>@drawable/ic_privacy_shield</item>
+        <item>@drawable/ic_auto_awesome</item>
+    </array>
 </resources>

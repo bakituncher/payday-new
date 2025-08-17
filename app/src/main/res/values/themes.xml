@@ -29,4 +29,14 @@
         <item name="android:drawableTint">?attr/colorPrimary</item>
     </style>
 
+    <style name="TextAppearance.App.Onboarding.Title" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/montserrat_bold</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <style name="TextAppearance.App.Onboarding.Description" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:lineSpacingMultiplier">1.2</item>
+    </style>
+
 </resources>
