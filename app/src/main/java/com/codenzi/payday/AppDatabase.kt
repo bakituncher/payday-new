@@ -1,7 +1,5 @@
 package com.codenzi.payday
 
-package com.codenzi.payday
-
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
