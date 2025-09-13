@@ -90,11 +90,50 @@ class PaydayViewModel(application: Application) : AndroidViewModel(application) 
         }
     }.asLiveData()
 
+    private val _budgets = MutableStateFlow<List<BudgetWithDetails>>(emptyList())
+    val budgets: StateFlow<List<BudgetWithDetails>> = _budgets.asStateFlow()
+
+    private val _accounts = MutableStateFlow<List<Account>>(emptyList())
+    val accounts: StateFlow<List<Account>> = _accounts.asStateFlow()
+
+    private val _totalBalance = MutableStateFlow(0.0)
+    val totalBalance: StateFlow<Double> = _totalBalance.asStateFlow()
+
+    private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    val categories: StateFlow<List<Category>> = _categories.asStateFlow()
+
+    private val _pieChartData = MutableStateFlow<List<PieEntry>>(emptyList())
+    val pieChartData: StateFlow<List<PieEntry>> = _pieChartData.asStateFlow()
+
 
     init {
         checkUsageStreakAchievements()
         loadData()
         checkForRestoreValidation()
+
+        viewModelScope.launch {
+            repository.getBudgetsWithDetails().collect { budgetList ->
+                _budgets.value = budgetList
+            }
+        }
+
+        viewModelScope.launch {
+            repository.getAllAccounts().collect { accountList ->
+                _accounts.value = accountList
+            }
+        }
+
+        viewModelScope.launch {
+            repository.getTotalBalance().collect { balance ->
+                _totalBalance.value = balance
+            }
+        }
+
+        viewModelScope.launch {
+            repository.getAllCategories().collect { categoryList ->
+                _categories.value = categoryList
+            }
+        }
     }
 
     // BİLDİRİM SİSTEMİ İÇİN YENİ FONKSİYON
@@ -185,6 +224,14 @@ class PaydayViewModel(application: Application) : AndroidViewModel(application) 
                     val totalSavings = allTransactionsInCycle
                         .filter { it.categoryId == ExpenseCategory.getSavingsCategoryId() }
                         .sumOf { it.amount }
+
+                    // New Pie Chart Logic
+                    val allCategories = _categories.value
+                    val pieEntries = categorySpending.mapNotNull { spending ->
+                        val categoryName = allCategories.find { it.id == spending.categoryId }?.name ?: "Other"
+                        if(spending.totalAmount > 0) PieEntry(spending.totalAmount.toFloat(), categoryName) else null
+                    }
+                    _pieChartData.value = pieEntries
 
                     updateUi(result, salaryAmount, totalExpenses, totalSavings, goals, categorySpending, carryOverAmount)
                     generateFinancialInsights(totalExpenses, totalSavings, categorySpending, salaryAmount, carryOverAmount, result)
@@ -367,13 +414,14 @@ class PaydayViewModel(application: Application) : AndroidViewModel(application) 
         _widgetUpdateEvent.postValue(Event(Unit))
     }
 
-    fun insertTransaction(name: String, amount: Double, categoryId: Int, isRecurring: Boolean) = viewModelScope.launch {
+    fun insertTransaction(name: String, amount: Double, categoryId: Int?, accountId: Int, isRecurring: Boolean) = viewModelScope.launch {
         if (name.isNotBlank() && amount > 0) {
             val transaction = Transaction(
                 name = name,
                 amount = amount,
                 date = Date(),
                 categoryId = categoryId,
+                accountId = accountId,
                 isRecurringTemplate = isRecurring
             )
             repository.insertTransaction(transaction)

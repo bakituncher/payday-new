@@ -50,6 +50,21 @@
         app:chipSpacingHorizontal="8dp"
         app:singleSelection="true" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Account"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/accountSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:minHeight="48dp"/>
+
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/recurringSwitch"
         android:layout_width="match_parent"

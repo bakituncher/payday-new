@@ -375,4 +375,9 @@
         <item>It\'s your money, your data. All information stays only on your phone. No one else can see your financial situation, not even us.</item>
         <item>Leave the stress of managing money behind. Take the first step to enjoy life with financial clarity.</item>
     </string-array>
+
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_transactions">Transactions</string>
+    <string name="title_budgets">Budgets</string>
+    <string name="title_accounts">Accounts</string>
 </resources>

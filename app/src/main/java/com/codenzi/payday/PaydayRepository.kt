@@ -30,8 +30,38 @@ class PaydayRepository(private val context: Context) {
 
     private val prefs = context.dataStore
     private val gson = Gson()
-    private val transactionDao = AppDatabase.getDatabase(context.applicationContext).transactionDao()
+    private val db = AppDatabase.getDatabase(context.applicationContext)
+    private val transactionDao = db.transactionDao()
+    private val accountDao = db.accountDao()
+    private val categoryDao = db.categoryDao()
+    private val budgetDao = db.budgetDao()
     private val googleDriveManager = GoogleDriveManager(context)
+
+    fun getBudgetsWithDetails(): Flow<List<BudgetWithDetails>> {
+        return kotlinx.coroutines.flow.combine(
+            budgetDao.getAllBudgets(),
+            categoryDao.getAllCategories(),
+            transactionDao.getAllTransactionsFlow()
+        ) { budgets, categories, transactions ->
+            budgets.map { budget ->
+                val category = categories.find { it.id == budget.categoryId }
+                val spentAmount = transactions
+                    .filter { it.categoryId == budget.categoryId && it.date >= budget.startDate && it.date <= budget.endDate }
+                    .sumOf { it.amount }
+                BudgetWithDetails(budget, category, spentAmount)
+            }
+        }
+    }
+
+    fun getAllAccounts(): Flow<List<Account>> = accountDao.getAllAccounts()
+
+    fun getAllCategories(): Flow<List<Category>> = categoryDao.getAllCategories()
+
+    fun getTotalBalance(): Flow<Double> {
+        return accountDao.getAllAccounts().map { accounts ->
+            accounts.sumOf { it.balance }
+        }
+    }
 
     companion object {
         val KEY_PAYDAY_VALUE = intPreferencesKey("payday")
