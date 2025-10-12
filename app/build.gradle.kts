@@ -148,5 +148,6 @@ dependencies {
     // --- CORE LIBRARY DESUGARING ---
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
-    implementation("com.google.android.gms:play-services-ads:23.0.0")
+    // implementation("com.google.android.gms:play-services-ads:23.0.0")
+    implementation("com.appodeal.ads:sdk:3.2.1")
 }

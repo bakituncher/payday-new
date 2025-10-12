@@ -35,11 +35,14 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import com.appodeal.ads.Appodeal
+import com.appodeal.ads.BannerView
+import com.appodeal.ads.InterstitialCallbacks
 import com.codenzi.payday.databinding.ActivityMainBinding
 import com.codenzi.payday.notifications.NotificationScheduler
-import com.google.android.gms.ads.*
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+// import com.google.android.gms.ads.*
+// import com.google.android.gms.ads.interstitial.InterstitialAd
+// import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -83,8 +86,8 @@ class MainActivity : AppCompatActivity() {
     private val fromBottom: Animation by lazy { AnimationUtils.loadAnimation(this, R.anim.fab_open) }
     private val toBottom: Animation by lazy { AnimationUtils.loadAnimation(this, R.anim.fab_close) }
     private var isFabMenuOpen = false
-    private var adView: AdView? = null // AdView artık nullable
-    private var mInterstitialAd: InterstitialAd? = null
+    // private var adView: AdView? = null // AdView artık nullable
+    // private var mInterstitialAd: InterstitialAd? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -136,15 +139,30 @@ class MainActivity : AppCompatActivity() {
         firebaseAnalytics = Firebase.analytics
 
         // --- REKLAM KODLARI ---
-        MobileAds.initialize(this) {}
-        val testDeviceIds = listOf("BCF3B4664E529BDE4CC3E6B2CB090F7B")
-        val configuration = RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
-        MobileAds.setRequestConfiguration(configuration)
+        // MobileAds.initialize(this) {}
+        // val testDeviceIds = listOf("BCF3B4664E529BDE4CC3E6B2CB090F7B")
+        // val configuration = RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
+        // MobileAds.setRequestConfiguration(configuration)
 
-        // Banner ve Geçiş Reklamını Yükle
-        loadBanner()
-        loadInterstitialAd()
+        // // Banner ve Geçiş Reklamını Yükle
+        // loadBanner()
+        // loadInterstitialAd()
         // --- REKLAM KODLARI SONU ---
+
+        Appodeal.setBannerViewId(R.id.appodealBannerView)
+        Appodeal.show(this, Appodeal.BANNER_VIEW)
+
+        Appodeal.setInterstitialCallbacks(object : InterstitialCallbacks {
+            override fun onInterstitialLoaded(isPrecache: Boolean) {}
+            override fun onInterstitialFailedToLoad() {}
+            override fun onInterstitialShown() {}
+            override fun onInterstitialShowFailed() {}
+            override fun onInterstitialClicked() {}
+            override fun onInterstitialClosed() {
+                startActivity(Intent(this@MainActivity, ReportsActivity::class.java))
+            }
+            override fun onInterstitialExpired() {}
+        })
 
         updateGreetingMessage()
         setupTitleRunnable()
@@ -163,66 +181,67 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestPermissions()
     }
 
-    private fun loadBanner() {
-        if (adView != null) {
-            binding.adViewContainer.removeView(adView)
-            adView?.destroy()
-        }
+    // private fun loadBanner() {
+    //     if (adView != null) {
+    //         binding.adViewContainer.removeView(adView)
+    //         adView?.destroy()
+    //     }
 
-        adView = AdView(this)
-        binding.adViewContainer.addView(adView)
-        val adRequest = AdRequest.Builder().build()
+    //     adView = AdView(this)
+    //     binding.adViewContainer.addView(adView)
+    //     val adRequest = AdRequest.Builder().build()
 
-        val adWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val windowMetrics = windowManager.currentWindowMetrics
-            (windowMetrics.bounds.width() / resources.displayMetrics.density).toInt()
-        } else {
-            @Suppress("DEPRECATION")
-            val displayMetrics = DisplayMetrics()
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.getMetrics(displayMetrics)
-            (displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
-        }
+    //     val adWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    //         val windowMetrics = windowManager.currentWindowMetrics
+    //         (windowMetrics.bounds.width() / resources.displayMetrics.density).toInt()
+    //     } else {
+    //         @Suppress("DEPRECATION")
+    //         val displayMetrics = DisplayMetrics()
+    //         @Suppress("DEPRECATION")
+    //         windowManager.defaultDisplay.getMetrics(displayMetrics)
+    //         (displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+    //     }
 
-        val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
-        adView?.adUnitId = getString(R.string.admob_banner_ad_unit_id)
-        adView?.setAdSize(adSize)
-        adView?.loadAd(adRequest)
-    }
+    //     val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
+    //     adView?.adUnitId = getString(R.string.admob_banner_ad_unit_id)
+    //     adView?.setAdSize(adSize)
+    //     adView?.loadAd(adRequest)
+    // }
 
-    private fun loadInterstitialAd() {
-        val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(this, getString(R.string.admob_interstitial_ad_unit_id), adRequest,
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(interstitialAd: InterstitialAd) {
-                    Log.d("AdMob", "Interstitial ad loaded.")
-                    mInterstitialAd = interstitialAd
-                }
+    // private fun loadInterstitialAd() {
+    //     val adRequest = AdRequest.Builder().build()
+    //     InterstitialAd.load(this, getString(R.string.admob_interstitial_ad_unit_id), adRequest,
+    //         object : InterstitialAdLoadCallback() {
+    //             override fun onAdLoaded(interstitialAd: InterstitialAd) {
+    //                 Log.d("AdMob", "Interstitial ad loaded.")
+    //                 mInterstitialAd = interstitialAd
+    //             }
 
-                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    Log.e("AdMob", "Interstitial ad failed to load: ${loadAdError.message}")
-                    mInterstitialAd = null
-                }
-            })
-    }
+    //             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+    //                 Log.e("AdMob", "Interstitial ad failed to load: ${loadAdError.message}")
+    //                 mInterstitialAd = null
+    //             }
+    //         })
+    // }
 
     // --- YAŞAM DÖNGÜSÜ YÖNETİMİ ---
     override fun onResume() {
         super.onResume()
-        adView?.resume()
+        Appodeal.onResume(this, Appodeal.BANNER_VIEW)
+        // adView?.resume()
         titleHandler.post(titleRunnable)
     }
 
     override fun onPause() {
         super.onPause()
-        adView?.pause()
+        // adView?.pause()
         titleHandler.removeCallbacks(titleRunnable)
         binding.toolbar.title = originalAppName
     }
 
     override fun onDestroy() {
-        adView?.destroy()
-        adView = null
+        // adView?.destroy()
+        // adView = null
         super.onDestroy()
     }
 
@@ -235,14 +254,8 @@ class MainActivity : AppCompatActivity() {
             }
             R.id.action_settings -> settingsLauncher.launch(Intent(this, SettingsActivity::class.java))
             R.id.action_reports -> {
-                if (mInterstitialAd != null) {
-                    mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
-                        override fun onAdDismissedFullScreenContent() {
-                            startActivity(Intent(this@MainActivity, ReportsActivity::class.java))
-                            loadInterstitialAd()
-                        }
-                    }
-                    mInterstitialAd?.show(this)
+                if (Appodeal.isLoaded(Appodeal.INTERSTITIAL)) {
+                    Appodeal.show(this, Appodeal.INTERSTITIAL)
                 } else {
                     startActivity(Intent(this, ReportsActivity::class.java))
                 }
@@ -255,16 +268,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupObservers() {
         viewModel.showAdEvent.observe(this) { event ->
             event.getContentIfNotHandled()?.let {
-                if (mInterstitialAd != null) {
-                    mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
-                        override fun onAdDismissedFullScreenContent() {
-                            super.onAdDismissedFullScreenContent()
-                            loadInterstitialAd()
-                        }
-                    }
-                    mInterstitialAd?.show(this)
-                } else {
-                    loadInterstitialAd()
+                if (Appodeal.isLoaded(Appodeal.INTERSTITIAL)) {
+                    Appodeal.show(this, Appodeal.INTERSTITIAL)
                 }
             }
         }

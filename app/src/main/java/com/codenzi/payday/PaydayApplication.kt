@@ -8,6 +8,9 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import com.appodeal.ads.Appodeal
+import com.appodeal.ads.ApdInitializationCallback
+import com.appodeal.ads.ApdInitializationError
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -21,6 +24,17 @@ class PaydayApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        Appodeal.initialize(
+            this,
+            "YOUR_APP_KEY",
+            Appodeal.INTERSTITIAL or Appodeal.REWARDED_VIDEO or Appodeal.BANNER,
+            object : ApdInitializationCallback {
+                override fun onInitializationFinished(errors: List<ApdInitializationError>?) {
+                    // Appodeal initialization finished
+                }
+            }
+        )
 
         // Uygulamanın yaşam döngüsünü dinlemeye başla
         ProcessLifecycleOwner.get().lifecycle.addObserver(AppLifecycleObserver())
