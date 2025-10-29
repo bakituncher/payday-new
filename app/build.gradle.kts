@@ -26,13 +26,19 @@ android {
         applicationId = "com.codenzi.payday"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.1.0"
+        versionCode = 12
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // --- EKLEME: AdMob App ID için Manifest Placeholder'ı ---
         manifestPlaceholders["admob_app_id"] = localProperties.getProperty("admob_app_id", "ca-app-pub-3940256099942544~3347511713")
+
+        // --- EKLEME: 16 KB Sayfa Boyutu Desteği için NDK Yapılandırması ---
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     packaging {
@@ -102,6 +108,8 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.1")
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
+    // Edge-to-Edge desteği için
+    implementation("androidx.activity:activity:1.9.3")
 
     // --- YAŞAM DÖNGÜSÜ (LIFECYCLE) VE VIEWMODEL ---
     implementation(libs.androidx.lifecycle.viewmodel.ktx)

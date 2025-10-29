@@ -34,7 +34,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.ViewCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.activity.enableEdgeToEdge
 import com.codenzi.payday.databinding.ActivityMainBinding
 import com.codenzi.payday.notifications.NotificationScheduler
 import com.google.android.gms.ads.*
@@ -130,9 +133,18 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Android 15+ için Edge-to-Edge desteği
+        enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Sistem barlarının arkasına içerik çizilmesini engellemek için padding ekle
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+            windowInsets
+        }
+
         firebaseAnalytics = Firebase.analytics
 
         // --- REKLAM KODLARI ---
